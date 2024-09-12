@@ -2,7 +2,6 @@
 
 set -euo pipefail
 
-# TODO: Ensure this is the correct GitHub homepage where releases can be downloaded for kakoune.
 GH_REPO="https://github.com/mawww/kakoune"
 TOOL_NAME="kakoune"
 TOOL_TEST="kak -version"
@@ -31,9 +30,9 @@ list_github_tags() {
 }
 
 list_all_versions() {
-	# TODO: Adapt this. By default we simply list the tag names from GitHub releases.
-	# Change this function if kakoune has other means of determining installable versions.
-	list_github_tags
+	list_github_tags |
+		# Filter for YYYY.MM.DD versions
+		grep -E '^[0-9]{4}\.[0-9]{2}\.[0-9]{2}$'
 }
 
 download_release() {
@@ -41,7 +40,6 @@ download_release() {
 	version="$1"
 	filename="$2"
 
-	# TODO: Adapt the release URL convention for kakoune
 	url="$GH_REPO/archive/v${version}.tar.gz"
 
 	echo "* Downloading $TOOL_NAME release $version..."
@@ -61,10 +59,28 @@ install_version() {
 		mkdir -p "$install_path"
 		cp -r "$ASDF_DOWNLOAD_PATH"/* "$install_path"
 
-		# TODO: Assert kakoune executable exists.
+		# Search for the path to Makefile in $install_path
+		local path_to_makefile
+		path_to_makefile=$(find "$install_path" -name "Makefile" | head -n 1)
+
+		if [ -z "$path_to_makefile" ]; then
+			fail "Makefile not found in $install_path"
+		fi
+
+		# Run make in the directory containing the Makefile
+		local makefile_dir
+		makefile_dir=$(dirname "$path_to_makefile")
+
+		# Force build to use GCC 10 in order to compile sources 2020.09.01 and earlier
+		if dpkg --compare-versions "$version" le "2020.09.01"; then
+			CC=gcc-10 CXX=g++-10 make -C "$makefile_dir"
+		else
+			make -C "$makefile_dir"
+		fi
+
 		local tool_cmd
 		tool_cmd="$(echo "$TOOL_TEST" | cut -d' ' -f1)"
-		test -x "$install_path/$tool_cmd" || fail "Expected $install_path/$tool_cmd to be executable."
+		test -x "$install_path/src/$tool_cmd" || fail "Expected $install_path/src/$tool_cmd to be executable."
 
 		echo "$TOOL_NAME $version installation was successful!"
 	) || (
