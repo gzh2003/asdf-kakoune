@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+# let asdf create shims for installed escripts
+echo "bin/src"
